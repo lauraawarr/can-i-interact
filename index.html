@@ -1,0 +1,319 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Can I Interact</title>
+<style>
+@font-face { 
+	font-family: 'Barrio';
+	src: url('fonts/Barrio/Barrio-Regular.ttf'); 
+} 
+@font-face { 
+	font-family: 'Pangolin';
+	src: url('fonts/Pangolin/Pangolin-Regular.ttf'); 
+}
+
+</style>
+
+<script src="https://code.createjs.com/createjs-2015.11.26.min.js"></script>
+<script src="https://d309knd7es5f10.cloudfront.net/zim_4.7.0.js"></script>
+<script src="libraries/features.js"></script>
+
+<script>
+
+var scaling = "full"; // makes stage the window size but does not scale content
+var width = null;
+var height = null;
+var color = "#000";
+var frame = new zim.Frame(scaling, width, height, color); 
+frame.on("ready", function() {
+
+	var stage = frame.stage;
+	var stageW = frame.width;
+	var stageH = frame.height;
+
+	frame.loadAssets(["background2.jpg", "left-arrow.png", "right-arrow.png", "up-arrow.png", "down-arrow.png", "h-key.png", "r-key.png", "Intro.png", "question.png"], 'images/');
+	frame.on("complete", function(){
+		var background2 = frame.asset("background2.jpg");
+		background2.center(stage);
+		background2.alpha = 0.3;
+
+	///// Create help button and intro page
+		var questionMark = frame.asset("question.png");
+		var questionBack = new zim.Rectangle(questionMark.height, questionMark.width, "#000"); 
+		stage.addChild(questionBack);
+		stage.addChild(questionMark);
+
+		questionMark.x = questionBack.x = stageW - (questionMark.width + 10);
+		questionMark.y = questionBack.y = 10;
+		questionMark.cursor = "pointer";
+		questionBack.cursor = "pointer";
+
+		var intro = frame.asset("Intro.png");
+		var introBack = new zim.Rectangle(stageW, stageH, "#000");
+		var introHolder = new createjs.Container();
+
+		// Open intro page on help button click
+		questionBack.on("click", function(){
+			introBack.center(stage);
+			intro.center(stage);
+			intro.alpha = introBack.alpha = 0;
+			intro.animate({
+				obj: {alpha: 1},
+				time: 500
+			});
+			introBack.animate({
+				obj: {alpha: 0.8},
+				time: 500
+			});
+		});
+
+		// Close intro page with click anywhere
+		introBack.on("click", function(){
+			intro.animate({
+				obj: {alpha: 0},
+				time: 500
+			});
+			introBack.animate({
+				obj: {alpha: 0},
+				time: 500
+			});
+			setTimeout(function(){
+				stage.removeChild(intro);
+				stage.removeChild(introBack);
+			}, 500);
+		});
+
+
+	///// Create Controls Legend
+		var space = 10;
+		var labels = ["CCW", "CW", "Forward","Backward" , "Hide", "Reset"];
+		var images = [frame.asset("up-arrow.png"), frame.asset("down-arrow.png"), frame.asset("right-arrow.png"), frame.asset("left-arrow.png"), frame.asset("h-key.png"), frame.asset("r-key.png")];
+		var controlLegend = new swoopjs.Legend( labels , images , space);
+		stage.addChild(controlLegend);
+		controlLegend.x = stageW - (controlLegend.width);
+		controlLegend.y = stageH - (controlLegend.height);
+
+	//// Parses JSON Data  
+		var myRequest = new XMLHttpRequest; 
+		var json;
+		myRequest.onreadystatechange = function(){  
+			if(myRequest.readyState === 4 && myRequest.status == 200){ 
+				json = JSON.parse(myRequest.responseText).data;
+				init(); // waits for response before proceeding
+
+			} else if(myRequest.readyState === 4 && myRequest.status != 200){ 
+				// error log if issue with connection
+				json = {};
+				console.log("Error: " + myRequest.status);
+			};
+		};
+
+		myRequest.open("GET", "libraries/data.json", true); 
+		myRequest.send(null);
+
+
+		function init(){
+	///// Define array of Features
+			var features = [];
+			var featureNames = []
+			// console.log(json);
+			for (f in json){
+				featureNames.push(f);
+			};
+
+			featureNames.sort(); //alphabetize list of features
+
+			for (f in featureNames){
+				feat = new swoopjs.Feature( featureNames[f] , json );
+				features.push(feat);
+			};
+
+	////// Create Bars - add to graph
+			var browsers = ["chrome", "firefox","safari", "opera", "ie"];
+			var colors = ["#ce4630","#d8810e", "#fce03d","#3abc0f", "#1b75bc", "#591b8e", "#8e1b81"];
+			// var colors = ["#e93476","#f38342","#64b6ca", "#854080", "#fed93c"];
+			// var colors = ["tomato", "yellow", "blue", "purple", "orange"];
+
+			var bar;
+			var rot = 8;
+			var radius = Math.min(stageW/5, stageH/5);
+			var numFeats = 45; //number of features to be displayed
+			var screenIndex = 0;
+
+			var graph = new createjs.Container();
+			stage.addChild(graph);
+
+			function drawGraph(screenIndex){
+				graph.removeAllChildren();
+
+				for (var x = 0; x < numFeats; x++){
+					bar = new swoopjs.Bar(features[screenIndex*numFeats + x], browsers, colors, radius);
+					graph.addChild(bar);
+					bar.x = stageW/2;
+					bar.y = stageH/2;
+					bar.rotation = 	180 + x*rot;
+					bar.alpha = 0.75;
+				}
+			};
+			drawGraph(screenIndex); // draws graph immediately
+
+	///// Create Title
+			var title = new zim.Label({
+				text: "Welcome!",
+				align: "center",
+				size: (Math.min(stageW, stageH))/30,
+				color: "#fff",
+				rollColor: "#fff",
+				font: "Barrio"
+				// font: "Pangolin, cursive"
+			});
+			title.center(stage);
+
+	////// Create Browser Legend
+			var images = [];
+			var img;
+			for (var c = 0; c < colors.length; c++){
+				img = new zim.Circle(10, colors[c]);
+				images.push(img);
+			};
+			var space = 10;
+
+			var browserLegend = new swoopjs.Legend( browsers, images , space);
+			stage.addChild(browserLegend);
+			browserLegend.x = 30;
+			browserLegend.y = stageH - (browserLegend.height + 20);
+
+	////// Expand target bar on hover event
+			var lastTarget = graph.getChildAt(0);
+			graph.on("mouseover", function(ev){
+
+				var bar = ev.target;
+
+				var featName = bar.feature.name;
+				title.text = featName;
+				stage.setChildIndex(title, graph.numChildren - 1); // keeps title on top of graph
+
+				bar.grow();
+				lastTarget.shrink();
+
+				lastTarget = bar;
+				stage.update();
+			});
+
+	////// Add KeyPress Events
+			var target = lastTarget;//graph.getChildAt(1);
+			var index;// = 1;
+			var hidden = false;
+			controlLegend.startPos = [controlLegend.x, controlLegend.y];
+			browserLegend.startPos = [browserLegend.x, browserLegend.y];
+
+			frame.on("keydown", function(ev){ // Cycle through bars with arrow keys
+				index = graph.getChildIndex(lastTarget);
+				var key = ev.keyCode;
+				if (key == 38 || key == 40){
+					if (key == 40){  //down
+						index++;
+						if (index == numFeats) index = 0;
+		
+					} else if (key == 38 ){  //up
+						index--;
+						if (index < 0) index = numFeats - 1;
+					}
+		
+					target = graph.getChildAt(index);
+					var featName = target.feature.name;
+					title.text = featName;
+					stage.setChildIndex(title, graph.numChildren - 1); // keeps title on top of graph
+					target.grow();
+					lastTarget.shrink();
+					lastTarget = target;
+					stage.update();
+
+				} else if (key == 37 || key == 39){ // Cycle through various "screens"
+					var len = Math.floor(featureNames.length/numFeats);
+					if (key == 39){  // right
+						screenIndex++;
+						if (screenIndex == len) screenIndex = 0;
+		
+					} else if (key == 37 ){  // left
+						screenIndex--;
+						if (screenIndex < 0) screenIndex = len - 1;
+					}
+					drawGraph(screenIndex);
+					target = graph.getChildAt(0);
+					// lastTarget = target;
+					target.grow();
+					title.text = target.feature.name;
+					stage.setChildIndex(title, graph.numChildren - 1); // keeps title on top of graph
+					stage.update();
+
+				} else if (key == 82){  // Reset with spin animation (R)
+					screenIndex = 0;
+					drawGraph(screenIndex);
+					spin();
+					title.text = "Welcome!";
+				} else if (key == 72){  // Hide legends (H)
+					if (hidden){
+						hidden = false;
+						controlLegend.animate({
+							obj: {x: controlLegend.startPos[0]},
+							time: 800
+						});
+						browserLegend.animate({
+							obj: {x: browserLegend.startPos[0]},
+							time: 800
+						});
+					} else {
+						hidden = true;
+						controlLegend.animate({
+							obj: {x: stageW + controlLegend.width},
+							time: 800
+						});
+						browserLegend.animate({
+							obj: {x: - browserLegend.width},
+							time: 800
+						});
+					};
+				};
+			});
+
+	////// Create "Spin" animation
+			var lastBar = graph.getChildAt(0);
+			var bar;
+			function spin(){
+				for (var i = 0; i < graph.numChildren; i++){
+					bar = graph.getChildAt(i);
+					bar.grow();
+					lastBar.shrink();
+					lastBar = bar;
+					stage.update();
+					
+				};
+				lastBar.shrink();
+			};
+			spin(); // calls spin immediately
+
+			stage.update();
+
+		}; // end of init
+
+
+	///// Resize gets called initially
+		frame.on("resize", resize);
+		function resize(e) {
+			stageW = frame.width;
+			stageH = frame.height;
+			// can redraw things at different sizes or use scaling here
+			
+			stage.update();
+		}
+	}); // end frame complete
+}); // end of ready
+</script>
+</head>
+
+<body>
+
+</body>
+</html>
